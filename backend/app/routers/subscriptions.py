@@ -1,0 +1,36 @@
+"""Router for subscription management and dashboard endpoints."""
+
+from typing import Any, Dict, List
+from fastapi import APIRouter
+
+router = APIRouter(tags=["subscriptions"])
+
+
+@router.get("/subscriptions", response_model=List[Dict[str, Any]])
+def get_subscriptions() -> List[Dict[str, Any]]:
+    """Retrieve all tracked subscriptions.
+
+    Stubbed: Returns empty list.
+    TODO: Query subscriptions table from SQLite database.
+    """
+    return []
+
+
+@router.get("/dashboard", response_model=Dict[str, Any])
+def get_dashboard() -> Dict[str, Any]:
+    """Retrieve aggregated dashboard metrics and summary data.
+
+    Stubbed: Returns empty metrics and empty lists.
+    TODO: Aggregate total monthly spend, active count, price hike alerts,
+    and high forgotten-score subscriptions from SQLite database.
+    """
+    return {
+        "metrics": {
+            "total_monthly_spend": 0.0,
+            "active_subscriptions": 0,
+            "detected_price_hikes": 0,
+            "forgotten_subscriptions": 0,
+        },
+        "subscriptions": [],
+        "alerts": [],
+    }
