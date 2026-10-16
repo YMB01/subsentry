@@ -3,7 +3,9 @@
 import logging
 from typing import Any, Dict, List
 from app.db import connect
+from app.services.extractor import extract_all
 from app.services import gmail_client
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,17 +56,16 @@ def ingest_receipts() -> int:
 
 
 def extract_subscriptions(emails: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Step 2 Extract: Parse structured subscription details using Gemini.
-
-    TODO:
-      - For each email, invoke services.extractor.extract_subscription(email).
-      - Upsert parsed merchant, amount, frequency, renewal date into subscriptions table.
-      - Record new price point into price_history table.
-      - Return list of extracted subscriptions.
-    """
-    # TODO: Step 2 extract logic goes here
+    """Step 2 Extract: Parse structured subscription details using Gemini / fallback."""
     _ = emails
-    return []
+    extract_all()
+    conn = connect()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM subscriptions")
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
 
 
 def detect_insights(subscriptions: List[Dict[str, Any]]) -> Dict[str, Any]:

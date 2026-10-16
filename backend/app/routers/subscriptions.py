@@ -23,12 +23,15 @@ def get_emails_count() -> Dict[str, int]:
 
 @router.get("/subscriptions", response_model=List[Dict[str, Any]])
 def get_subscriptions() -> List[Dict[str, Any]]:
-    """Retrieve all tracked subscriptions.
-
-    Stubbed: Returns empty list.
-    TODO: Query subscriptions table from SQLite database.
-    """
-    return []
+    """Retrieve all tracked subscriptions from SQLite database."""
+    conn = connect()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM subscriptions ORDER BY merchant ASC")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 
 @router.get("/dashboard", response_model=Dict[str, Any])

@@ -95,5 +95,22 @@ def init_db(db_path: Optional[str] = None) -> None:
                 );
                 """
             )
+
+            # Ensure additional columns exist for extraction tracking and flexible schema access
+            def _ensure_col(table: str, col_name: str, col_def: str):
+                cursor.execute(f"PRAGMA table_info({table});")
+                existing_cols = [row[1] for row in cursor.fetchall()]
+                if col_name not in existing_cols:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def};")
+
+            _ensure_col("emails", "processed", "INTEGER DEFAULT 0")
+            _ensure_col("subscriptions", "name", "TEXT")
+            _ensure_col("subscriptions", "current_amount", "REAL")
+            _ensure_col("subscriptions", "billing_cycle", "TEXT")
+            _ensure_col("subscriptions", "last_charge_date", "TEXT")
+            _ensure_col("subscriptions", "is_trial", "INTEGER DEFAULT 0")
+            _ensure_col("price_history", "charge_date", "TEXT")
+            _ensure_col("price_history", "source_message_id", "TEXT")
+            _ensure_col("price_history", "source", "TEXT")
     finally:
         conn.close()

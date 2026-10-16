@@ -2,9 +2,20 @@
 
 from typing import Any, Dict
 from fastapi import APIRouter
+from app.services.extractor import extract_all
 from app.services.pipeline import run_pipeline
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.post("/extract")
+def trigger_extract() -> Dict[str, Any]:
+    """Trigger receipt extraction across all stored emails.
+
+    Reads unextracted emails, parses subscription metadata using Gemini
+    or deterministic fallback, upserts subscriptions, and updates price history.
+    """
+    return extract_all()
 
 
 @router.post("/scan")
