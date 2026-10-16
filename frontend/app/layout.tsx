@@ -28,7 +28,7 @@ export default function RootLayout({
                   <span className="font-bold text-lg tracking-tight text-white flex items-center gap-1.5">
                     SubSentry
                     <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                      Scaffold
+                      Sentinel
                     </span>
                   </span>
                   <span className="text-[11px] text-slate-400">Subscription Intelligence</span>
