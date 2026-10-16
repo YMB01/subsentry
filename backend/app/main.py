@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db import init_db
-from app.routers import subscriptions, jobs
+from app.routers import subscriptions, jobs, alerts
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.add_middleware(
 # Register routers under /api
 app.include_router(subscriptions.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
+app.include_router(alerts.router, prefix="/api")
 
 
 @app.get("/health")

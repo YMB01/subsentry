@@ -43,23 +43,23 @@ DEMO_EMAILS: List[Dict[str, str]] = [
     {
         "message_id": "seed-spotify-20260815",
         "from_addr": "receipts@spotify.com",
-        "subject": "Your Spotify receipt — $10.99",
+        "subject": "Your Spotify receipt — $9.99",
         "date": "2026-08-15",
-        "snippet": "Your Spotify Premium subscription has been renewed. Payment of $10.99 received.",
+        "snippet": "Your Spotify Premium subscription has been renewed. Payment of $9.99 received.",
     },
     {
         "message_id": "seed-spotify-20260915",
         "from_addr": "receipts@spotify.com",
-        "subject": "Your Spotify receipt — $10.99",
+        "subject": "Your Spotify receipt — $9.99",
         "date": "2026-09-15",
-        "snippet": "Your Spotify Premium subscription has been renewed. Payment of $10.99 received.",
+        "snippet": "Your Spotify Premium subscription has been renewed. Payment of $9.99 received.",
     },
     {
         "message_id": "seed-spotify-20261015",
         "from_addr": "receipts@spotify.com",
-        "subject": "Your Spotify receipt — $10.99",
+        "subject": "Your Spotify receipt — $9.99",
         "date": "2026-10-15",
-        "snippet": "Your Spotify Premium subscription has been renewed. Payment of $10.99 received.",
+        "snippet": "Your Spotify Premium subscription has been renewed. Payment of $9.99 received.",
     },
     {
         "message_id": "seed-spotify-engagement",
@@ -265,6 +265,36 @@ DEMO_EMAILS: List[Dict[str, str]] = [
         "subject": "Your GitHub receipt — $10.00",
         "date": "2026-10-15",
         "snippet": "GitHub payment receipt: GitHub Copilot monthly subscription of $10.00 paid.",
+    },
+
+    # 11. Apple Music (Engagement: Yes; Duplicate with Spotify)
+    {
+        "message_id": "seed-applemusic-20260815",
+        "from_addr": "receipts@apple.com",
+        "subject": "Your Apple Music receipt — $10.99",
+        "date": "2026-08-15",
+        "snippet": "Apple invoice: Apple Music Individual monthly subscription renewed for $10.99.",
+    },
+    {
+        "message_id": "seed-applemusic-20260915",
+        "from_addr": "receipts@apple.com",
+        "subject": "Your Apple Music receipt — $10.99",
+        "date": "2026-09-15",
+        "snippet": "Apple invoice: Apple Music Individual monthly subscription renewed for $10.99.",
+    },
+    {
+        "message_id": "seed-applemusic-20261015",
+        "from_addr": "receipts@apple.com",
+        "subject": "Your Apple Music receipt — $10.99",
+        "date": "2026-10-15",
+        "snippet": "Apple invoice: Apple Music Individual monthly subscription renewed for $10.99.",
+    },
+    {
+        "message_id": "seed-applemusic-engagement",
+        "from_addr": "news@apple.com",
+        "subject": "Your Apple Music weekly mix",
+        "date": "2026-10-14",
+        "snippet": "Listen to new releases and trending playlists curated for you on Apple Music.",
     },
 ]
 

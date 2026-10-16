@@ -2,10 +2,21 @@
 
 from typing import Any, Dict
 from fastapi import APIRouter
+from app.services.detector import detect_all
 from app.services.extractor import extract_all
 from app.services.pipeline import run_pipeline
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.post("/detect")
+def trigger_detect() -> Dict[str, Any]:
+    """Trigger intelligence detection across subscriptions, price history, and emails.
+
+    Detects price increases, forgotten subscriptions, category duplicates,
+    and renewal dates approaching within 7 days.
+    """
+    return detect_all()
 
 
 @router.post("/extract")

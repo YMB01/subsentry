@@ -88,9 +88,13 @@ def init_db(db_path: Optional[str] = None) -> None:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     type TEXT NOT NULL,
                     subscription_id INTEGER,
+                    subscription_name TEXT,
                     message TEXT NOT NULL,
-                    sent_at TEXT NOT NULL,
-                    channel TEXT NOT NULL,
+                    data TEXT,
+                    is_read INTEGER DEFAULT 0,
+                    created_at TEXT,
+                    sent_at TEXT DEFAULT '',
+                    channel TEXT DEFAULT 'in_app',
                     FOREIGN KEY (subscription_id) REFERENCES subscriptions (id) ON DELETE SET NULL
                 );
                 """
@@ -112,5 +116,9 @@ def init_db(db_path: Optional[str] = None) -> None:
             _ensure_col("price_history", "charge_date", "TEXT")
             _ensure_col("price_history", "source_message_id", "TEXT")
             _ensure_col("price_history", "source", "TEXT")
+            _ensure_col("alerts", "data", "TEXT")
+            _ensure_col("alerts", "is_read", "INTEGER DEFAULT 0")
+            _ensure_col("alerts", "created_at", "TEXT")
+            _ensure_col("alerts", "subscription_name", "TEXT")
     finally:
         conn.close()

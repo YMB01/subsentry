@@ -92,6 +92,10 @@ def normalize_merchant(
 
 def normalize_category(merchant: str, candidate_category: str = "") -> str:
     """Map merchant and extracted category to canonical standard categories."""
+    m_lower = merchant.lower().strip()
+    if "copilot" in m_lower or "github" in m_lower:
+        return "devtools"
+
     cand = candidate_category.lower().strip()
     valid_categories = {
         "streaming",
@@ -101,11 +105,11 @@ def normalize_category(merchant: str, candidate_category: str = "") -> str:
         "fitness",
         "security",
         "cloud",
+        "devtools",
     }
     if cand in valid_categories:
         return cand
 
-    m_lower = merchant.lower()
     if "netflix" in m_lower or "hulu" in m_lower or "tv" in m_lower:
         return "streaming"
     if "spotify" in m_lower or "music" in m_lower:
@@ -118,7 +122,7 @@ def normalize_category(merchant: str, candidate_category: str = "") -> str:
         return "fitness"
     if "securevpn" in m_lower or "vpn" in m_lower or "security" in m_lower:
         return "security"
-    if "icloud" in m_lower or "copilot" in m_lower or "github" in m_lower or "cloud" in m_lower:
+    if "icloud" in m_lower or "cloud" in m_lower:
         return "cloud"
 
     return candidate_category.strip() or "other"
@@ -178,6 +182,8 @@ def _fallback_extract(email: Dict[str, Any]) -> ExtractionResult:
 
     # 5. Determine category
     category = normalize_category(merchant)
+    if merchant == "GitHub Copilot" or "copilot" in merchant.lower():
+        category = "devtools"
 
     # 6. Calculate confidence
     if merchant != "Unknown" and amount > 0:
@@ -291,6 +297,8 @@ Respond ONLY with a JSON object matching this schema.
             snippet=snippet,
         )
         category = normalize_category(merchant, data.get("category", ""))
+        if merchant == "GitHub Copilot" or "copilot" in merchant.lower():
+            category = "devtools"
         billing_cycle = normalize_billing_cycle(
             merchant,
             text=f"{subject} {snippet}",
@@ -389,14 +397,22 @@ def extract_all(db: Optional[sqlite3.Connection] = None) -> Dict[str, int]:
                 else:
                     via_fallback_count += 1
 
-                merchant = result.merchant
+                merchant = normalize_merchant(
+                    result.merchant,
+                    from_addr=email_dict.get("from_addr", ""),
+                    subject=email_dict.get("subject", ""),
+                    snippet=email_dict.get("snippet", ""),
+                )
+                if merchant == "GitHub Copilot" or "copilot" in merchant.lower():
+                    result.category = "devtools"
+
                 # Only upsert subscription if merchant is valid and is either a paid receipt or a trial
                 if merchant != "Unknown" and (result.amount > 0 or result.is_trial):
                     cursor.execute(
                         """
                         SELECT id, amount, current_amount, last_charge_date, status, is_trial
                         FROM subscriptions
-                        WHERE LOWER(merchant) = LOWER(?)
+                        WHERE LOWER(TRIM(merchant)) = LOWER(TRIM(?))
                         """,
                         (merchant,),
                     )

@@ -69,22 +69,11 @@ def extract_subscriptions(emails: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def detect_insights(subscriptions: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Step 3 Detect: Identify price hikes, forgotten subscriptions, and duplicates.
+    """Step 3 Detect: Identify price hikes, forgotten subscriptions, and duplicates."""
+    from app.services.detector import detect_all
 
-    TODO:
-      - Call services.detector.detect_price_hikes() for each subscription.
-      - Call services.detector.detect_forgotten() for inactive services.
-      - Call services.detector.detect_duplicates() across similar services.
-      - Persist generated alerts in alerts table and dispatch via services.notifier.send_telegram().
-      - Return dictionary of detected insights.
-    """
-    # TODO: Step 3 detect logic goes here
     _ = subscriptions
-    return {
-        "price_hikes": [],
-        "forgotten": [],
-        "duplicates": [],
-    }
+    return detect_all()
 
 
 def run_pipeline() -> Dict[str, Any]:
