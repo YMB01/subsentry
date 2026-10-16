@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
     GMAIL_CREDENTIALS_PATH: str = "gmail_credentials.json"
+    GMAIL_TOKEN_PATH: str = "token.json"
     DATABASE_PATH: str = "subsentry.db"
 
     model_config = SettingsConfigDict(

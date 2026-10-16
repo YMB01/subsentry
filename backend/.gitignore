@@ -1,0 +1,16 @@
+# Environment variables and secrets
+.env
+.env*.local
+*.env
+gmail_credentials.json
+token.json
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/

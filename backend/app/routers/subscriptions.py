@@ -2,8 +2,23 @@
 
 from typing import Any, Dict, List
 from fastapi import APIRouter
+from app.db import connect
 
 router = APIRouter(tags=["subscriptions"])
+
+
+@router.get("/emails/count", response_model=Dict[str, int])
+def get_emails_count() -> Dict[str, int]:
+    """Retrieve total count of stored emails."""
+    conn = connect()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM emails")
+        row = cursor.fetchone()
+        count = int(row[0]) if row else 0
+        return {"count": count}
+    finally:
+        conn.close()
 
 
 @router.get("/subscriptions", response_model=List[Dict[str, Any]])

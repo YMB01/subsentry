@@ -3,6 +3,7 @@
 .env*.local
 *.env
 gmail_credentials.json
+token.json
 
 # SQLite databases
 *.db
