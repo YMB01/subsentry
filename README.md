@@ -139,8 +139,34 @@ The frontend application will start on **`http://localhost:3000`**.
 | `GET` | `/health` | Service health status | Active (`200 OK`) |
 | `GET` | `/api/subscriptions` | List tracked subscriptions | Stubbed (empty list) |
 | `GET` | `/api/dashboard` | Dashboard metrics & overview | Stubbed (empty metrics) |
-| `POST` | `/api/jobs/scan` | Trigger email ingest & extraction pipeline | Stubbed |
-| `POST` | `/api/jobs/renewal-check` | Check approaching renewal dates | Stubbed |
+| `POST` | `/api/jobs/scan` | Trigger email ingest & extraction pipeline | Active |
+| `POST` | `/api/jobs/renewal-check` | Check approaching renewal dates | Active |
+| `POST` | `/api/jobs/run` | Full proactive pipeline (ingest -> extract -> detect -> Telegram notify) | Active (`200 OK`) |
+
+---
+
+## Daily scheduler (cron-job.org)
+
+To automate the proactive pipeline daily:
+
+1. **Create Account**: Register for a free account at [cron-job.org](https://cron-job.org).
+2. **Create New Cronjob**:
+   - **Title**: `SubSentry Daily Pipeline`
+   - **URL**: `https://<your-deployed-backend>/api/jobs/run`
+   - **Request Method**: `POST`
+   - **Schedule**: Daily at `08:00` (select your local timezone)
+3. **Execution**: The scheduler sends a POST request to `/api/jobs/run`, triggering receipt ingestion, Gemini extraction, detector evaluation, and Telegram notifications for newly detected alerts.
+
+> [!NOTE]
+> **Publicly Reachable URL Required**: `cron-job.org` requires a publicly accessible URL (e.g., hosted on Render, Railway, Fly.io, or exposed locally via ngrok). For local development and demonstration, trigger `POST /api/jobs/run` manually (or via curl / PowerShell):
+>
+> ```bash
+> # Linux / macOS / Git Bash
+> curl -X POST http://localhost:8000/api/jobs/run
+>
+> # Windows PowerShell
+> Invoke-RestMethod -Uri http://localhost:8000/api/jobs/run -Method Post
+> ```
 
 ---
 

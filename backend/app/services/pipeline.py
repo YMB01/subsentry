@@ -1,11 +1,14 @@
 """Subscription discovery and processing pipeline orchestrator."""
 
 import logging
-from typing import Any, Dict, List
-from app.db import connect
-from app.services.extractor import extract_all
-from app.services import gmail_client
+import sqlite3
+from typing import Any, Dict, List, Optional
 
+from app.db import connect, init_db
+from app.services import gmail_client
+from app.services.detector import detect_all
+from app.services.extractor import extract_all
+from app.services.notifier import notify_new_alerts
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +25,8 @@ def ingest_receipts() -> int:
     """
     try:
         emails = gmail_client.fetch_receipts()
-    except FileNotFoundError:
-        logger.warning("Gmail not configured, run `python -m app.seed` for demo data")
+    except (FileNotFoundError, Exception) as exc:
+        logger.warning("Gmail not configured or unavailable (%s), run `python -m app.seed` for demo data", exc)
         return 0
 
     if not emails:
@@ -55,45 +58,78 @@ def ingest_receipts() -> int:
         conn.close()
 
 
-def extract_subscriptions(emails: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def extract_subscriptions(
+    emails: Optional[List[Dict[str, Any]]] = None,
+    db: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
     """Step 2 Extract: Parse structured subscription details using Gemini / fallback."""
     _ = emails
-    extract_all()
-    conn = connect()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM subscriptions")
-        return [dict(row) for row in cursor.fetchall()]
-    finally:
-        conn.close()
+    return extract_all(db=db)
 
 
-def detect_insights(subscriptions: List[Dict[str, Any]]) -> Dict[str, Any]:
+def detect_insights(
+    subscriptions: Optional[List[Dict[str, Any]]] = None,
+    db: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
     """Step 3 Detect: Identify price hikes, forgotten subscriptions, and duplicates."""
-    from app.services.detector import detect_all
-
     _ = subscriptions
-    return detect_all()
+    return detect_all(db=db)
 
 
-def run_pipeline() -> Dict[str, Any]:
-    """Run full pipeline: Step 1 ingest -> Step 2 extract -> Step 3 detect.
+def run_pipeline(db: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    """Run full pipeline: Step 1 ingest -> Step 2 extract -> Step 3 detect -> Step 4 notify.
+
+    Steps:
+      1. ingest_receipts()
+      2. extract_all(db)
+      3. detect_all(db)
+      4. notify_new_alerts(newly created alerts only)
+
+    CRITICAL anti-spam rule:
+      Only the alerts created in THIS run (detect_all's returned 'alerts' list) get Telegram messages.
+      A re-run that creates 0 alerts sends 0 messages.
 
     Returns:
-        Dict[str, Any]: Summary result of pipeline execution.
+        Dict[str, Any]: {
+            "ingested": n,
+            "extracted": {...},
+            "alerts_created": m,
+            "telegram_sent": k,
+        }
     """
-    # Step 1: Ingest
-    ingested_count = ingest_receipts()
+    init_db()
+    conn = db if db is not None else connect()
+    should_close = db is None
 
-    # Step 2: Extract
-    extracted = extract_subscriptions([])
+    try:
+        # Step 1: Ingest receipts
+        ingested = ingest_receipts()
 
-    # Step 3: Detect
-    insights = detect_insights(extracted)
+        # Step 2: Extract receipts
+        extracted = extract_all(db=conn)
 
-    return {
-        "status": "completed",
-        "ingested_count": ingested_count,
-        "extracted_count": len(extracted),
-        "insights": insights,
-    }
+        # Step 3: Detect insights
+        detection_result = detect_all(db=conn)
+        alerts_created = detection_result.get("alerts_created", 0)
+        newly_created_alerts = detection_result.get("alerts", [])
+
+        # Step 4: Proactive notifications for newly created alerts only
+        telegram_sent = notify_new_alerts(newly_created_alerts)
+
+        logger.info(
+            "Pipeline completed: ingested=%d, extracted=%s, alerts_created=%d, telegram_sent=%d",
+            ingested,
+            extracted.get("processed", 0),
+            alerts_created,
+            telegram_sent,
+        )
+
+        return {
+            "ingested": ingested,
+            "extracted": extracted,
+            "alerts_created": alerts_created,
+            "telegram_sent": telegram_sent,
+        }
+    finally:
+        if should_close:
+            conn.close()

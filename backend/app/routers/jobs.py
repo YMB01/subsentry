@@ -9,6 +9,12 @@ from app.services.pipeline import run_pipeline
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+@router.post("/run")
+def trigger_run() -> Dict[str, Any]:
+    """Execute the full proactive pipeline synchronously: ingest -> extract -> detect -> notify."""
+    return run_pipeline()
+
+
 @router.post("/detect")
 def trigger_detect() -> Dict[str, Any]:
     """Trigger intelligence detection across subscriptions, price history, and emails.

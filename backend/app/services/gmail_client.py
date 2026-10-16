@@ -81,25 +81,24 @@ def fetch_receipts(query: str = DEFAULT_RECEIPT_QUERY) -> List[Dict[str, Any]]:
         raise FileNotFoundError("Gmail not configured")
 
     token_path = _resolve_backend_path(settings.GMAIL_TOKEN_PATH)
-    creds: Any = None
+    if not token_path.is_file():
+        raise FileNotFoundError(
+            "Gmail token.json not found. Run authentication flow or seed demo data."
+        )
 
-    if token_path.is_file():
-        try:
-            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-        except Exception as e:
-            logger.warning("Failed to load cached Gmail token: %s", e)
-            creds = None
+    try:
+        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    except Exception as e:
+        logger.warning("Failed to load cached Gmail token: %s", e)
+        raise FileNotFoundError("Invalid Gmail token.json file.")
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
+            with open(token_path, "w", encoding="utf-8") as token_file:
+                token_file.write(creds.to_json())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
-            creds = flow.run_local_server(port=0)
-
-        # Cache authorized token
-        with open(token_path, "w", encoding="utf-8") as token_file:
-            token_file.write(creds.to_json())
+            raise FileNotFoundError("Gmail credentials expired or invalid.")
 
     service = build("gmail", "v1", credentials=creds)
 
