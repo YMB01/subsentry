@@ -23,8 +23,10 @@ DEFAULT_RECEIPT_QUERY: str = (
 def _resolve_backend_path(path_str: str) -> Path:
     """Resolve file path relative to current working directory or backend root."""
     p = Path(path_str)
-    if p.is_absolute() or p.exists():
+    if p.is_absolute():
         return p
+    if p.exists():
+        return p.resolve()
 
     # Fallback to backend root relative to this file
     backend_root = Path(__file__).resolve().parent.parent.parent
@@ -32,7 +34,8 @@ def _resolve_backend_path(path_str: str) -> Path:
     if backend_p.exists():
         return backend_p
 
-    return p
+    # If file doesn't exist yet, return backend_p so new files are written to backend root
+    return backend_p
 
 
 def _is_real_credentials_file(creds_path: Path) -> bool:
@@ -58,11 +61,77 @@ def _is_real_credentials_file(creds_path: Path) -> bool:
         return False
 
 
+def get_credentials(interactive: bool = False, force_login: bool = False) -> Credentials:
+    """Retrieve valid Google OAuth credentials or run interactive desktop flow.
+
+    Args:
+        interactive: If True and credentials are not cached/valid, launches
+            the interactive browser OAuth desktop flow.
+        force_login: If True and interactive is True, forces a fresh authorization flow.
+
+    Returns:
+        Credentials: Authenticated google.oauth2.credentials.Credentials.
+
+    Raises:
+        FileNotFoundError: If credentials file is missing or invalid, or if cached
+            token is missing/expired in non-interactive mode.
+    """
+    settings = get_settings()
+    creds_path = _resolve_backend_path(settings.GMAIL_CREDENTIALS_PATH)
+
+    if not _is_real_credentials_file(creds_path):
+        raise FileNotFoundError("Gmail not configured")
+
+    token_path = _resolve_backend_path(settings.GMAIL_TOKEN_PATH)
+    creds = None
+
+    if not force_login and token_path.is_file():
+        try:
+            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+        except Exception as e:
+            logger.warning("Failed to load cached Gmail token: %s", e)
+            creds = None
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(token_path, "w", encoding="utf-8") as token_file:
+                token_file.write(creds.to_json())
+            logger.info("Refreshed and saved Gmail token to %s", token_path)
+        elif interactive:
+            logger.info("Starting Gmail OAuth desktop flow...")
+            flow = InstalledAppFlow.from_client_secrets_file(str(creds_path), SCOPES)
+            creds = flow.run_local_server(port=0)
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(token_path, "w", encoding="utf-8") as token_file:
+                token_file.write(creds.to_json())
+            logger.info("Saved authorized Gmail token to %s", token_path)
+        else:
+            if not token_path.is_file():
+                raise FileNotFoundError(
+                    "Gmail token.json not found. Run authentication flow or seed demo data."
+                )
+            raise FileNotFoundError("Gmail credentials expired or invalid.")
+
+    return creds
+
+
+def run_oauth_desktop_flow(force: bool = False) -> Credentials:
+    """Execute OAuth2 desktop authorization flow and cache the token to GMAIL_TOKEN_PATH."""
+    return get_credentials(interactive=True, force_login=force)
+
+
+# Convenience aliases
+authorize_desktop = run_oauth_desktop_flow
+run_oauth_flow = run_oauth_desktop_flow
+
+
 def fetch_receipts(query: str = DEFAULT_RECEIPT_QUERY) -> List[Dict[str, Any]]:
     """Fetch receipts and invoices from user's Gmail mailbox using Gmail API.
 
-    Performs OAuth2 desktop flow caching refresh token if real credentials exist.
-    Raises FileNotFoundError if real credentials file is not configured.
+    Uses cached token from GMAIL_TOKEN_PATH if present and valid.
+    Raises FileNotFoundError if real credentials file or token is not configured.
     Only extracts email snippet and metadata (no bodies).
 
     Args:
@@ -72,34 +141,9 @@ def fetch_receipts(query: str = DEFAULT_RECEIPT_QUERY) -> List[Dict[str, Any]]:
         List of dicts: {message_id, from_addr, subject, date, snippet}.
 
     Raises:
-        FileNotFoundError: If GMAIL_CREDENTIALS_PATH does not point to a valid file.
+        FileNotFoundError: If GMAIL_CREDENTIALS_PATH or GMAIL_TOKEN_PATH is invalid.
     """
-    settings = get_settings()
-    creds_path = _resolve_backend_path(settings.GMAIL_CREDENTIALS_PATH)
-
-    if not _is_real_credentials_file(creds_path):
-        raise FileNotFoundError("Gmail not configured")
-
-    token_path = _resolve_backend_path(settings.GMAIL_TOKEN_PATH)
-    if not token_path.is_file():
-        raise FileNotFoundError(
-            "Gmail token.json not found. Run authentication flow or seed demo data."
-        )
-
-    try:
-        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
-    except Exception as e:
-        logger.warning("Failed to load cached Gmail token: %s", e)
-        raise FileNotFoundError("Invalid Gmail token.json file.")
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            with open(token_path, "w", encoding="utf-8") as token_file:
-                token_file.write(creds.to_json())
-        else:
-            raise FileNotFoundError("Gmail credentials expired or invalid.")
-
+    creds = get_credentials(interactive=False)
     service = build("gmail", "v1", credentials=creds)
 
     response = service.users().messages().list(userId="me", q=query).execute()

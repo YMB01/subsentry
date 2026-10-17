@@ -217,7 +217,7 @@ def extract_receipt(email: Dict[str, Any]) -> ExtractionResult:
         message_id, from_addr (or sender), subject, date, snippet
 
     Primary path:
-        Calls Gemini (gemini-2.5-flash) with response_mime_type="application/json".
+        Calls Gemini (gemini-3.8-flash) with response_mime_type="application/json".
     Fallback path:
         Deterministic regex rules tuned to seed data.
     Never raises an exception — returns low-confidence result on error.

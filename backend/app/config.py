@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment or .env file."""
 
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-3.8-flash"
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
     GMAIL_CREDENTIALS_PATH: str = "gmail_credentials.json"

@@ -17,7 +17,7 @@ def ingest_receipts() -> int:
     """Step 1 Ingest: Fetch receipt/invoice emails from Gmail.
 
     Attempts to fetch receipts via services.gmail_client.fetch_receipts().
-    If Gmail is not configured (FileNotFoundError), logs advice and returns 0.
+    If Gmail is not configured or unavailable, falls back to seeded demo data.
     Inserts fetched emails into the emails table deduplicated by message_id.
 
     Returns:
@@ -26,8 +26,12 @@ def ingest_receipts() -> int:
     try:
         emails = gmail_client.fetch_receipts()
     except (FileNotFoundError, Exception) as exc:
-        logger.warning("Gmail not configured or unavailable (%s), run `python -m app.seed` for demo data", exc)
-        return 0
+        logger.warning(
+            "Gmail not configured or unavailable (%s), falling back to seeded demo data",
+            exc,
+        )
+        from app.seed import seed_demo_inbox
+        return seed_demo_inbox()
 
     if not emails:
         return 0

@@ -170,7 +170,7 @@
 | Variable | Scope | Required? | Default | Description & Where to Get It |
 |---|---|---|---|---|
 | `GEMINI_API_KEY` | Backend | **Optional** (Recommended) | `""` | Google Gemini API key for structured invoice extraction. Get free at [Google AI Studio](https://aistudio.google.com/). When omitted, the built-in deterministic rule-based fallback extracts demo receipts automatically. |
-| `GEMINI_MODEL` | Backend | No | `gemini-2.5-flash` | Gemini model variant used for structured JSON extraction. |
+| `GEMINI_MODEL` | Backend | No | `gemini-3.8-flash` | Gemini model variant used for structured JSON extraction. |
 | `TELEGRAM_BOT_TOKEN` | Backend | **Optional** | `""` | Telegram Bot token for sending real-time smartphone alerts. Create a bot in 30 seconds via [@BotFather](https://t.me/botfather). When omitted, Telegram delivery is skipped gracefully without errors. |
 | `TELEGRAM_CHAT_ID` | Backend | **Optional** | `""` | Your Telegram user or chat ID to receive notifications. Retrieve yours via [@userinfobot](https://t.me/userinfobot) or the Telegram API. |
 | `GMAIL_CREDENTIALS_PATH` | Backend | No | `gmail_credentials.json` | Path to Google Cloud OAuth 2.0 client credentials JSON for real Gmail syncing. Obtain from [Google Cloud Console](https://console.cloud.google.com/) with Gmail API enabled. |
