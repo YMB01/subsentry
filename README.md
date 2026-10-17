@@ -5,10 +5,10 @@
 [![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind%20CSS-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.11%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![SQLite](https://img.shields.io/badge/Database-SQLite%203-003B57?logo=sqlite)](https://www.sqlite.org/)
-[![Gemini](https://img.shields.io/badge/AI-Gemini%202.5%20Flash-4285F4?logo=google)](https://aistudio.google.com/)
+[![Gemini](https://img.shields.io/badge/AI-Gemini%203.5%20Flash-4285F4?logo=google)](https://aistudio.google.com/)
 [![Telegram](https://img.shields.io/badge/Alerts-Telegram%20Bot%20API-26A5E4?logo=telegram)](https://core.telegram.org/bots/api)
 
-**SubSentry** is an autonomous subscription intelligence sentinel that shields your finances from creeping recurring charges. By ingesting billing receipts directly from Gmail or a demo inbox, SubSentry employs **Gemini 2.5 Flash** structured outputs to normalize merchant charges, tracks price histories in an audit trail, pinpoints forgotten or zombie services through email engagement scoring, identifies redundant cross-service subscriptions, and delivers actionable, one-click cancellation guides directly to your phone via Telegram and a clean web dashboard before renewal deadlines strike.
+**SubSentry** is an autonomous subscription intelligence sentinel that shields your finances from creeping recurring charges. By ingesting billing receipts directly from Gmail or a demo inbox, SubSentry employs **Gemini 3.5 Flash** structured outputs to normalize merchant charges, tracks price histories in an audit trail, pinpoints forgotten or zombie services through email engagement scoring, identifies redundant cross-service subscriptions, and delivers actionable, one-click cancellation guides directly to your phone via Telegram and a clean web dashboard before renewal deadlines strike.
 
 ---
 
@@ -158,7 +158,7 @@
    ```
 
 4. **Start the Next.js development server**:
-   ```bash
+   ```bas
    npm run dev
    ```
    *The frontend dashboard will be available at `http://localhost:3000`.*
@@ -170,7 +170,7 @@
 | Variable | Scope | Required? | Default | Description & Where to Get It |
 |---|---|---|---|---|
 | `GEMINI_API_KEY` | Backend | **Optional** (Recommended) | `""` | Google Gemini API key for structured invoice extraction. Get free at [Google AI Studio](https://aistudio.google.com/). When omitted, the built-in deterministic rule-based fallback extracts demo receipts automatically. |
-| `GEMINI_MODEL` | Backend | No | `gemini-3.8-flash` | Gemini model variant used for structured JSON extraction. |
+| `GEMINI_MODEL` | Backend | No | `gemini-3.5-flash-lite` | Gemini model variant used for structured JSON extraction. |
 | `TELEGRAM_BOT_TOKEN` | Backend | **Optional** | `""` | Telegram Bot token for sending real-time smartphone alerts. Create a bot in 30 seconds via [@BotFather](https://t.me/botfather). When omitted, Telegram delivery is skipped gracefully without errors. |
 | `TELEGRAM_CHAT_ID` | Backend | **Optional** | `""` | Your Telegram user or chat ID to receive notifications. Retrieve yours via [@userinfobot](https://t.me/userinfobot) or the Telegram API. |
 | `GMAIL_CREDENTIALS_PATH` | Backend | No | `gmail_credentials.json` | Path to Google Cloud OAuth 2.0 client credentials JSON for real Gmail syncing. Obtain from [Google Cloud Console](https://console.cloud.google.com/) with Gmail API enabled. |
