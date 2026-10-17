@@ -34,6 +34,125 @@ class ExtractionResult(BaseModel):
     _source: str = PrivateAttr(default="fallback")
 
 
+def extract_domain_prefix(from_addr: str) -> str:
+    """Extract and capitalize the domain prefix from a sender address.
+
+    Example:
+        billing@acme.com -> 'Acme'
+        'Acme Support' <billing@mail.acme.com> -> 'Acme'
+    """
+    if not from_addr:
+        return "Unknown"
+    match = re.search(r"@([a-zA-Z0-9.-]+)", from_addr)
+    if not match:
+        return "Unknown"
+    domain = match.group(1).lower().strip(".")
+    parts = domain.split(".")
+    if not parts or not parts[0]:
+        return "Unknown"
+
+    common_subdomains = {
+        "mail", "email", "notifications", "notify", "news", "receipts",
+        "billing", "support", "updates", "info", "team", "orders",
+        "bounce", "em", "e", "send", "mailer", "invoicing", "app",
+        "service", "sub", "m", "smtp", "post",
+    }
+    prefix = parts[0]
+    if prefix in common_subdomains and len(parts) >= 3:
+        prefix = parts[1]
+
+    if not prefix:
+        return "Unknown"
+
+    if "-" in prefix:
+        capitalized = "-".join(part.capitalize() for part in prefix.split("-"))
+    else:
+        capitalized = prefix.capitalize()
+
+    return capitalized if capitalized else "Unknown"
+
+
+def discover_merchant(subject: str = "", from_addr: str = "") -> str:
+    """Derive merchant name from subject patterns or sender domain prefix.
+
+    Patterns evaluated in order:
+      1. '<Name> Order Receipt ...'
+      2. 'Your <Name> receipt'
+      3. 'Receipt from <Name>'
+      4. '<Name> Subscription'
+
+    Strips quotes and whitespace. If subject patterns do not yield a name,
+    falls back to sender domain prefix capitalized (e.g. billing@acme.com -> 'Acme').
+    Last resort: 'Unknown'.
+    """
+    clean_subj = subject.strip()
+    clean_subj = re.sub(
+        r"^(\s*(?:\[[^\]]+\]\s*|(?:fwd|re|fw)\s*:\s*))+",
+        "",
+        clean_subj,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    candidate = ""
+
+    # 1. <Name> Order Receipt ...
+    m1 = re.search(r"^(?:your\s+)?(.+?)\s+order\s+receipt\b", clean_subj, re.IGNORECASE)
+    if m1:
+        candidate = m1.group(1)
+    else:
+        # 2. Your <Name> receipt
+        m2 = re.search(r"^your\s+(.+?)\s+receipt\b", clean_subj, re.IGNORECASE)
+        if m2:
+            candidate = m2.group(1)
+        else:
+            # 3. Receipt from <Name>
+            m3 = re.search(
+                r"^(?:your\s+)?receipt\s+from\s+(.+?)(?:\s*[-—–:#|]|\s+for\b|$)",
+                clean_subj,
+                re.IGNORECASE,
+            )
+            if m3:
+                candidate = m3.group(1)
+            else:
+                # 4. <Name> Subscription
+                m4 = re.search(
+                    r"^(?:your\s+)?(.+?)\s+subscription\b",
+                    clean_subj,
+                    re.IGNORECASE,
+                )
+                if m4:
+                    candidate = m4.group(1)
+
+    if candidate:
+        candidate = candidate.strip()
+        candidate = candidate.strip("\"'`“”‘’")
+        candidate = candidate.strip(" -—–:#|.,")
+        candidate = candidate.strip("\"'`“”‘’").strip()
+        candidate = re.sub(r"\s+", " ", candidate)
+
+        # Reject if just dates/numbers/punctuation
+        if not re.match(r"^[\d\s\-_./]+$", candidate):
+            stop_words = {
+                "your", "my", "our", "the", "a", "an",
+                "receipt", "order", "subscription", "invoice",
+                "bill", "billing", "payment", "monthly", "annual",
+                "yearly", "weekly", "new", "renewal", "service",
+                "account", "membership", "confirmation",
+            }
+            if (
+                candidate.lower() not in stop_words
+                and not candidate.lower().startswith(("order #", "invoice #", "receipt #"))
+                and len(candidate) > 1
+            ):
+                return candidate
+
+    domain_prefix = extract_domain_prefix(from_addr)
+    if domain_prefix and domain_prefix != "Unknown":
+        return domain_prefix
+
+    return "Unknown"
+
+
 def normalize_merchant(
     candidate: str,
     from_addr: str = "",
@@ -43,6 +162,8 @@ def normalize_merchant(
     """Normalize merchant names to canonical format.
 
     Ensures 'Apple Music', 'Apple', and 'iCloud+' do not collapse into one merchant.
+    When candidate/from_addr/subject does not match a known merchant, discovers merchant
+    from subject patterns or sender domain prefix.
     """
     raw_from = from_addr.lower()
     raw_subj = subject.lower()
@@ -85,9 +206,13 @@ def normalize_merchant(
     if "github" in combined:
         return "GitHub Copilot"
 
-    # Fallback to cleaned candidate
+    # Fallback to cleaned candidate if already known / provided
     cleaned = candidate.strip()
-    return cleaned if cleaned else "Unknown"
+    if cleaned and cleaned.lower() != "unknown":
+        return cleaned
+
+    # Unknown merchant discovery from subject / sender
+    return discover_merchant(subject=subject, from_addr=from_addr)
 
 
 def normalize_category(merchant: str, candidate_category: str = "") -> str:
@@ -106,6 +231,7 @@ def normalize_category(merchant: str, candidate_category: str = "") -> str:
         "security",
         "cloud",
         "devtools",
+        "other",
     }
     if cand in valid_categories:
         return cand
@@ -152,62 +278,81 @@ def _fallback_extract(email: Dict[str, Any]) -> ExtractionResult:
     """Deterministic regex extraction path tuned to seed and receipt patterns.
 
     Used when GEMINI_API_KEY is not set or when Gemini API call raises an error.
+    Handles both known and discovered merchants without raising exceptions.
     """
-    from_addr = str(email.get("from_addr") or email.get("sender") or "")
-    subject = str(email.get("subject") or "")
-    date_val = str(email.get("date") or "")
-    snippet = str(email.get("snippet") or "")
-    combined_text = f"{subject} {snippet}"
+    try:
+        if not isinstance(email, dict):
+            email = {}
 
-    # 1. Detect merchant
-    merchant = normalize_merchant("", from_addr=from_addr, subject=subject, snippet=snippet)
+        from_addr = str(email.get("from_addr") or email.get("sender") or "")
+        subject = str(email.get("subject") or "")
+        date_val = str(email.get("date") or "")
+        snippet = str(email.get("snippet") or "")
+        combined_text = f"{subject} {snippet}"
 
-    # 2. Detect trial keywords
-    trial_regex = re.compile(r"\b(trial ends|free trial|trial period|extended trial|trial)\b", re.IGNORECASE)
-    is_trial = bool(trial_regex.search(combined_text))
+        # 1. Detect merchant (canonical known or discovered)
+        merchant = normalize_merchant("", from_addr=from_addr, subject=subject, snippet=snippet)
 
-    # 3. Detect amount & currency
-    # Looks for $XX.XX or $XX
-    amount_match = re.search(r"\$\s*(\d+(?:\.\d{1,2})?)", combined_text)
-    amount = 0.0
-    currency = "USD"
-    if amount_match:
-        try:
-            amount = float(amount_match.group(1))
-        except ValueError:
-            amount = 0.0
+        # 2. Detect trial keywords
+        trial_regex = re.compile(r"\b(trial ends|free trial|trial period|extended trial|trial)\b", re.IGNORECASE)
+        is_trial = bool(trial_regex.search(combined_text))
 
-    # 4. Infer billing cycle
-    billing_cycle = normalize_billing_cycle(merchant, text=combined_text)
+        # 3. Detect amount & currency
+        # Looks for $XX.XX or $XX
+        amount_match = re.search(r"\$\s*(\d+(?:\.\d{1,2})?)", combined_text)
+        amount = 0.0
+        currency = "USD"
+        if amount_match:
+            try:
+                amount = float(amount_match.group(1))
+            except ValueError:
+                amount = 0.0
 
-    # 5. Determine category
-    category = normalize_category(merchant)
-    if merchant == "GitHub Copilot" or "copilot" in merchant.lower():
-        category = "devtools"
+        # 4. Infer billing cycle
+        billing_cycle = normalize_billing_cycle(merchant, text=combined_text)
 
-    # 6. Calculate confidence
-    if merchant != "Unknown" and amount > 0:
-        confidence = 0.95
-    elif merchant != "Unknown" and is_trial:
-        confidence = 0.85
-    elif merchant != "Unknown":
-        # Likely an engagement email or notification without receipt charge
-        confidence = 0.30
-    else:
-        confidence = 0.10
+        # 5. Determine category
+        category = normalize_category(merchant)
+        if merchant == "GitHub Copilot" or "copilot" in merchant.lower():
+            category = "devtools"
 
-    res = ExtractionResult(
-        merchant=merchant,
-        amount=amount,
-        currency=currency,
-        billing_cycle=billing_cycle,
-        charge_date=date_val,
-        is_trial=is_trial,
-        category=category,
-        confidence=confidence,
-    )
-    res._source = "fallback"
-    return res
+        # 6. Calculate confidence
+        if merchant != "Unknown" and amount > 0:
+            confidence = 0.95
+        elif merchant != "Unknown" and is_trial:
+            confidence = 0.85
+        elif merchant != "Unknown":
+            # Likely an engagement email or notification without receipt charge
+            confidence = 0.30
+        else:
+            confidence = 0.10
+
+        res = ExtractionResult(
+            merchant=merchant,
+            amount=amount,
+            currency=currency,
+            billing_cycle=billing_cycle,
+            charge_date=date_val,
+            is_trial=is_trial,
+            category=category,
+            confidence=confidence,
+        )
+        res._source = "fallback"
+        return res
+    except Exception as exc:
+        logger.warning("Unexpected error in _fallback_extract: %s. Returning fallback result.", exc)
+        fallback_res = ExtractionResult(
+            merchant="Unknown",
+            amount=0.0,
+            currency="USD",
+            billing_cycle="unknown",
+            charge_date=str(email.get("date") or "") if isinstance(email, dict) else "",
+            is_trial=False,
+            category="other",
+            confidence=0.0,
+        )
+        fallback_res._source = "fallback"
+        return fallback_res
 
 
 def extract_receipt(email: Dict[str, Any]) -> ExtractionResult:
@@ -444,6 +589,15 @@ def extract_all(db: Optional[sqlite3.Connection] = None) -> Dict[str, int]:
                             ),
                         )
                         subscription_id = cursor.lastrowid
+                        logger.info(
+                            "Created subscription id=%s for merchant='%s' (amount=%.2f, status='%s') from email id=%s (message_id=%s)",
+                            subscription_id,
+                            merchant,
+                            result.amount,
+                            status,
+                            email_id,
+                            msg_id,
+                        )
                     else:
                         subscription_id = existing["id"]
                         if result.amount > 0:
@@ -473,12 +627,28 @@ def extract_all(db: Optional[sqlite3.Connection] = None) -> Dict[str, int]:
                                         subscription_id,
                                     ),
                                 )
+                                logger.info(
+                                    "Updated subscription id=%s for merchant='%s' (amount=%.2f, date=%s) from email id=%s (message_id=%s)",
+                                    subscription_id,
+                                    merchant,
+                                    result.amount,
+                                    result.charge_date,
+                                    email_id,
+                                    msg_id,
+                                )
                         elif result.is_trial and existing["status"] == "trial":
                             existing_date = existing["last_charge_date"] or ""
                             if not existing_date or result.charge_date >= existing_date:
                                 cursor.execute(
                                     "UPDATE subscriptions SET last_charge_date = ? WHERE id = ?",
                                     (result.charge_date, subscription_id),
+                                )
+                                logger.info(
+                                    "Updated trial date for subscription id=%s (merchant='%s', date=%s) from email id=%s",
+                                    subscription_id,
+                                    merchant,
+                                    result.charge_date,
+                                    email_id,
                                 )
 
                     # Append to price_history if email has a positive charge amount
@@ -506,6 +676,28 @@ def extract_all(db: Optional[sqlite3.Connection] = None) -> Dict[str, int]:
                                     msg_id,
                                 ),
                             )
+                else:
+                    # Log explicit skip reason to ensure no email is silently skipped
+                    if merchant == "Unknown":
+                        logger.info(
+                            "Skipping email id=%s (message_id=%s): merchant could not be identified ('Unknown')",
+                            email_id,
+                            msg_id,
+                        )
+                    elif result.amount <= 0 and not result.is_trial:
+                        logger.info(
+                            "Skipping email id=%s (message_id=%s, merchant='%s'): no charge ($0.00) and not a trial receipt",
+                            email_id,
+                            msg_id,
+                            merchant,
+                        )
+                    else:
+                        logger.info(
+                            "Skipping email id=%s (message_id=%s, merchant='%s'): does not qualify as a subscription charge or trial",
+                            email_id,
+                            msg_id,
+                            merchant,
+                        )
 
                 # Mark email as processed
                 cursor.execute("UPDATE emails SET processed = 1 WHERE id = ?", (email_id,))
