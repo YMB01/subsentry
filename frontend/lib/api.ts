@@ -6,6 +6,8 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+
+
 export interface Subscription {
   id: number;
   merchant: string;
@@ -302,7 +304,7 @@ export function formatDateDisplay(dateStr?: string | null): string {
 }
 
 /**
- * Map alert type to display emoji
+ * Map alert type to display emoji (kept for backwards compatibility)
  */
 export function getAlertEmoji(type: string): string {
   switch (type) {
@@ -320,7 +322,25 @@ export function getAlertEmoji(type: string): string {
 }
 
 /**
- * Map alert type to badge styling
+ * Map alert type to clean monochrome small-caps text label
+ */
+export function getAlertLabel(type: string): string {
+  switch (type) {
+    case "price_increase":
+      return "PRICE HIKE";
+    case "possibly_forgotten":
+      return "FORGOTTEN";
+    case "duplicate":
+      return "DUPLICATE";
+    case "renewal_soon":
+      return "RENEWAL";
+    default:
+      return "ALERT";
+  }
+}
+
+/**
+ * Map alert type to monochrome badge styling
  */
 export function getAlertBadge(type: string): {
   label: string;
@@ -330,27 +350,28 @@ export function getAlertBadge(type: string): {
     case "price_increase":
       return {
         label: "Price Hike",
-        badgeClass: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+        badgeClass: "bg-black text-white border border-black",
       };
     case "possibly_forgotten":
       return {
         label: "Possibly Forgotten",
-        badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        badgeClass: "bg-gray-100 text-black border border-gray-300",
       };
     case "duplicate":
       return {
         label: "Overlap / Duplicate",
-        badgeClass: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+        badgeClass: "bg-gray-100 text-black border border-gray-300",
       };
     case "renewal_soon":
       return {
         label: "Renewal Soon",
-        badgeClass: "bg-sky-500/10 text-sky-400 border-sky-500/30",
+        badgeClass: "bg-black text-white border border-black",
       };
     default:
       return {
         label: "Alert",
-        badgeClass: "bg-slate-500/10 text-slate-400 border-slate-500/30",
+        badgeClass: "bg-white text-gray-800 border border-gray-300",
       };
   }
 }
+

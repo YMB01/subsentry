@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   Subscription,
   AlertItem,
@@ -18,7 +19,6 @@ import {
   getEffectiveAmount,
   formatCurrency,
   formatDateDisplay,
-  getAlertEmoji,
   getAlertBadge,
 } from "../lib/api";
 
@@ -28,7 +28,6 @@ export default function DashboardPage() {
   const [emailCount, setEmailCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isScanning, setIsScanning] = useState<boolean>(false);
-  const [scanResultLine, setScanResultLine] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedGuides, setExpandedGuides] = useState<Record<number, boolean>>({});
   const [markingIds, setMarkingIds] = useState<Record<number, boolean>>({});
@@ -52,6 +51,7 @@ export default function DashboardPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load dashboard data";
       setError(msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -68,17 +68,20 @@ export default function DashboardPage() {
     setError(null);
     try {
       const result: PipelineRunResult = await runPipeline();
-      // Formulate result line matching user requirement
       const sentCount = result.telegram_sent ?? 0;
-      const plural = sentCount === 1 ? "alert" : "alerts";
-      setScanResultLine(`${sentCount} new ${plural} sent to Telegram`);
+      if (sentCount > 0) {
+        const plural = sentCount === 1 ? "alert" : "alerts";
+        toast.success(`Scan complete — ${sentCount} new ${plural} sent to Telegram`);
+      } else {
+        toast("Scan complete — nothing new");
+      }
 
       // Refresh data
       await loadDashboardData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Pipeline scan failed";
       setError(msg);
-      setScanResultLine(null);
+      toast.error(msg);
     } finally {
       setIsScanning(false);
     }
@@ -96,6 +99,7 @@ export default function DashboardPage() {
 
     try {
       await markAlertRead(alertId);
+      toast("Marked as read");
     } catch (err: unknown) {
       // Revert if API call fails
       setAlerts((prev) =>
@@ -103,6 +107,7 @@ export default function DashboardPage() {
       );
       const msg = err instanceof Error ? err.message : "Failed to mark alert as read";
       setError(msg);
+      toast.error(msg);
     } finally {
       setMarkingIds((prev) => ({ ...prev, [alertId]: false }));
     }
@@ -123,19 +128,14 @@ export default function DashboardPage() {
   const renewalsIn7DaysCount = subscriptions.filter((s) => isRenewingWithin7Days(s)).length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 bg-white text-black">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-800/80">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-gray-200">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-              SubSentry
-            </h1>
-            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              Live Sentinel
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-400">
+          <h1 className="text-3xl font-extrabold tracking-tight text-black sm:text-4xl">
+            SubSentry
+          </h1>
+          <p className="mt-1.5 text-sm text-gray-600">
             Autonomous subscription audit, receipt invoice parsing, and proactive Telegram alerts.
           </p>
         </div>
@@ -143,8 +143,8 @@ export default function DashboardPage() {
         {/* Scan Actions & Status */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {emailCount !== null && (
-            <div className="text-xs font-mono text-slate-400 bg-slate-900/80 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+            <div className="text-xs font-mono text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
               <span>{emailCount} emails indexed</span>
             </div>
           )}
@@ -155,10 +155,10 @@ export default function DashboardPage() {
               type="button"
               onClick={handleScanNow}
               disabled={isScanning}
-              className={`inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all shadow-lg ${
+              className={`inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-colors ${
                 isScanning
-                  ? "bg-indigo-600/60 text-indigo-200 cursor-not-allowed border border-indigo-500/30"
-                  : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 active:scale-95 cursor-pointer"
+                  ? "bg-gray-400 text-gray-100 cursor-not-allowed"
+                  : "bg-black hover:bg-gray-800 text-white cursor-pointer"
               }`}
             >
               {isScanning ? (
@@ -188,7 +188,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   <svg
-                    className="w-3.5 h-3.5 mr-1.5"
+                    className="w-3.5 h-3.5 mr-1.5 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -208,38 +208,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Result line notification */}
-      {scanResultLine && (
-        <div
-          id="scan-result-line"
-          className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-indigo-300 text-xs font-medium animate-fadeIn"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-            </span>
-            <span>{scanResultLine}</span>
-          </div>
-          <button
-            onClick={() => setScanResultLine(null)}
-            className="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* Error alert if any */}
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-300 text-black text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span>⚠️</span>
+            <span className="font-mono text-xs font-bold">[ERROR]</span>
             <span>{error}</span>
           </div>
           <button
             onClick={() => setError(null)}
-            className="text-rose-400 hover:text-rose-200 text-xs px-2 py-0.5"
+            className="text-gray-600 hover:text-black text-xs px-2 py-0.5 border border-gray-300 rounded bg-white transition-colors"
           >
             Dismiss
           </button>
@@ -249,60 +227,58 @@ export default function DashboardPage() {
       {/* Stat Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {/* Card 1: Monthly burn */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur transition-all hover:border-slate-700/80">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-400">
+          <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
             <span>Monthly Burn</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
               Run-rate
             </span>
           </div>
           <div className="mt-3 flex items-baseline gap-1">
             <span
               id="stat-monthly-burn"
-              className="text-3xl font-extrabold tracking-tight text-white font-mono"
+              className="text-3xl font-extrabold tracking-tight text-black font-mono"
             >
               {isLoading ? "..." : formatCurrency(monthlyBurn)}
             </span>
-            <span className="text-xs text-slate-400 font-medium">/mo</span>
+            <span className="text-xs text-gray-500 font-medium">/mo</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-gray-500">
             Sum of monthly-equivalent active services
           </p>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
         </div>
 
         {/* Card 2: Active subscriptions */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur transition-all hover:border-slate-700/80">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-400">
+          <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
             <span>Active Subscriptions</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
               Discovered
             </span>
           </div>
           <div className="mt-3 flex items-baseline">
             <span
               id="stat-active-subs"
-              className="text-3xl font-extrabold tracking-tight text-white font-mono"
+              className="text-3xl font-extrabold tracking-tight text-black font-mono"
             >
               {isLoading ? "..." : activeSubsCount}
             </span>
-            <span className="ml-1 text-xs text-slate-400 font-medium">services</span>
+            <span className="ml-1 text-xs text-gray-500 font-medium">services</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-gray-500">
             Tracked recurring merchants in database
           </p>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
         </div>
 
         {/* Card 3: Unread alerts */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur transition-all hover:border-slate-700/80">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-400">
+          <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
             <span>Unread Alerts</span>
             <span
               className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
                 unreadAlertsCount > 0
-                  ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                  : "bg-slate-800 text-slate-400 border-slate-700"
+                  ? "bg-black text-white border-black font-medium"
+                  : "bg-gray-100 text-gray-600 border-gray-200"
               }`}
             >
               {unreadAlertsCount > 0 ? "Action Required" : "All Clear"}
@@ -311,39 +287,43 @@ export default function DashboardPage() {
           <div className="mt-3 flex items-baseline">
             <span
               id="stat-unread-alerts"
-              className="text-3xl font-extrabold tracking-tight text-white font-mono"
+              className="text-3xl font-extrabold tracking-tight text-black font-mono"
             >
               {isLoading ? "..." : unreadAlertsCount}
             </span>
-            <span className="ml-1 text-xs text-slate-400 font-medium">pending</span>
+            <span className="ml-1 text-xs text-gray-500 font-medium">pending</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-gray-500">
             Price increases, duplicates, and inactive risks
           </p>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
         </div>
 
         {/* Card 4: Renewals in next 7 days */}
-        <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur transition-all hover:border-slate-700/80">
-          <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-400">
+          <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
             <span>Renewals in Next 7 Days</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            <span
+              className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                renewalsIn7DaysCount > 0
+                  ? "bg-black text-white border-black font-medium"
+                  : "bg-gray-100 text-gray-600 border-gray-200"
+              }`}
+            >
               Within 7d
             </span>
           </div>
           <div className="mt-3 flex items-baseline">
             <span
               id="stat-renewals-7d"
-              className="text-3xl font-extrabold tracking-tight text-white font-mono"
+              className="text-3xl font-extrabold tracking-tight text-black font-mono"
             >
               {isLoading ? "..." : renewalsIn7DaysCount}
             </span>
-            <span className="ml-1 text-xs text-slate-400 font-medium">approaching</span>
+            <span className="ml-1 text-xs text-gray-500 font-medium">approaching</span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-gray-500">
             Imminent billing renewals to monitor
           </p>
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
         </div>
       </div>
 
@@ -353,28 +333,27 @@ export default function DashboardPage() {
         <section id="alerts-section" className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold tracking-tight text-white">
+              <h2 className="text-xl font-bold tracking-tight text-black">
                 Intelligence Alerts
               </h2>
-              <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-0.5 rounded-full border border-slate-800">
+              <span className="text-xs font-mono text-gray-600 bg-gray-100 px-2.5 py-0.5 rounded-full border border-gray-200">
                 {alerts.length} total &bull; {unreadAlertsCount} unread
               </span>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 divide-y divide-slate-800/60 overflow-hidden backdrop-blur">
+          <div className="rounded-2xl border border-gray-200 bg-white divide-y divide-gray-200 overflow-hidden shadow-none">
             {isLoading ? (
-              <div className="p-8 text-center text-sm text-slate-400 font-mono">
+              <div className="p-8 text-center text-sm text-gray-500 font-mono">
                 Loading intelligence alerts...
               </div>
             ) : alerts.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-400">
+              <div className="p-8 text-center text-sm text-gray-500">
                 No alerts detected. Trigger a scan to analyze recurring billing patterns.
               </div>
             ) : (
               alerts.map((alert) => {
                 const badge = getAlertBadge(alert.type);
-                const emoji = getAlertEmoji(alert.type);
                 const isMarking = markingIds[alert.id] || false;
                 const cancelGuideText =
                   alert.data?.cancel_guide || alert.cancel_guide;
@@ -386,63 +365,57 @@ export default function DashboardPage() {
                     id={`alert-card-${alert.id}`}
                     className={`p-4 sm:p-5 transition-all ${
                       alert.is_read
-                        ? "opacity-50 bg-slate-950/30"
-                        : "bg-slate-900/60 hover:bg-slate-900/80"
+                        ? "opacity-60 bg-gray-50/50"
+                        : "bg-white hover:bg-gray-50/80"
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      {/* Left: Emoji + Header + Message */}
-                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-xl bg-slate-800/90 border border-slate-700 flex items-center justify-center text-base flex-shrink-0 shadow-inner">
-                          {emoji}
-                        </div>
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-semibold text-sm text-white truncate">
-                              {alert.subscription_name || "Subscription Alert"}
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-sm text-black truncate">
+                            {alert.subscription_name || "Subscription Alert"}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${badge.badgeClass}`}
+                          >
+                            {badge.label}
+                          </span>
+                          {alert.is_read && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                              Read
                             </span>
-                            <span
-                              className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${badge.badgeClass}`}
-                            >
-                              {badge.label}
-                            </span>
-                            {alert.is_read && (
-                              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
-                                Read
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-300 leading-relaxed break-words">
-                            {alert.message}
-                          </p>
-
-                          {/* Cancellation guide collapsible */}
-                          {cancelGuideText && (
-                            <div className="pt-2">
-                              <button
-                                type="button"
-                                onClick={() => toggleGuide(alert.id)}
-                                className="inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
-                              >
-                                <span>{isExpanded ? "▾ Hide Cancel Guide" : "▸ How to Cancel"}</span>
-                              </button>
-
-                              {isExpanded && (
-                                <div className="mt-2 p-2.5 rounded-lg bg-slate-950/80 border border-slate-800/90 text-xs text-slate-300 font-sans leading-relaxed animate-fadeIn">
-                                  <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1">
-                                    <span>🛑 Cancellation Instructions</span>
-                                  </div>
-                                  <p className="text-slate-300">{cancelGuideText}</p>
-                                </div>
-                              )}
-                            </div>
                           )}
                         </div>
+                        <p className="text-xs text-gray-600 leading-relaxed break-words">
+                          {alert.message}
+                        </p>
+
+                        {/* Cancellation guide collapsible */}
+                        {cancelGuideText && (
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleGuide(alert.id)}
+                              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-black hover:underline transition-colors"
+                            >
+                              <span>{isExpanded ? "▾ Hide Cancel Guide" : "▸ How to Cancel"}</span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2 p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-700 font-sans leading-relaxed">
+                                <div className="text-[10px] font-mono uppercase tracking-wider text-black font-semibold mb-1 flex items-center gap-1">
+                                  <span>[ CANCELLATION INSTRUCTIONS ]</span>
+                                </div>
+                                <p className="text-gray-700">{cancelGuideText}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Right: Date + Mark Read Action */}
-                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 flex-shrink-0 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
-                        <span className="text-[11px] font-mono text-slate-400">
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 flex-shrink-0 self-stretch sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-200">
+                        <span className="text-[11px] font-mono text-gray-500">
                           {formatDateDisplay(alert.created_at)}
                         </span>
                         {!alert.is_read ? (
@@ -451,12 +424,12 @@ export default function DashboardPage() {
                             type="button"
                             onClick={() => handleMarkRead(alert.id)}
                             disabled={isMarking}
-                            className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white border border-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
+                            className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-black hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer"
                           >
                             {isMarking ? "Saving..." : "Mark read"}
                           </button>
                         ) : (
-                          <span className="text-[11px] font-mono text-slate-400 flex items-center gap-1">
+                          <span className="text-[11px] font-mono text-gray-500 flex items-center gap-1">
                             ✓ Read
                           </span>
                         )}
@@ -473,26 +446,26 @@ export default function DashboardPage() {
         <section id="subscriptions" className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-bold tracking-tight text-white">
+              <h2 className="text-xl font-bold tracking-tight text-black">
                 Active & Tracked Subscriptions
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-gray-500 mt-0.5">
                 Continuously monitored recurring services parsed from payment receipts.
               </p>
             </div>
             <Link
               href="/subscriptions"
-              className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+              className="inline-flex items-center gap-1 text-xs text-black font-semibold hover:underline"
             >
               <span>Full subscriptions directory</span>
               <span>→</span>
             </Link>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 overflow-hidden backdrop-blur">
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden shadow-none">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-[11px] uppercase font-mono text-slate-400">
+                <thead className="bg-gray-50 border-b border-gray-200 text-[11px] uppercase font-mono text-gray-600">
                   <tr>
                     <th scope="col" className="px-6 py-3.5">
                       Merchant
@@ -514,16 +487,16 @@ export default function DashboardPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-sans">
+                <tbody className="divide-y divide-gray-200 font-sans">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400 font-mono">
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500 font-mono">
                         Loading subscriptions...
                       </td>
                     </tr>
                   ) : subscriptions.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-400">
+                      <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
                         No subscriptions found. Click &quot;Scan now&quot; to parse inbox receipts.
                       </td>
                     </tr>
@@ -539,33 +512,28 @@ export default function DashboardPage() {
                         <tr
                           key={sub.id}
                           id={`subscription-row-${sub.id}`}
-                          className="hover:bg-slate-900/70 transition-colors"
+                          className="hover:bg-gray-50/80 transition-colors"
                         >
                           {/* Merchant */}
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-750 flex items-center justify-center font-bold text-xs text-indigo-400 uppercase flex-shrink-0">
-                                {sub.merchant ? sub.merchant.slice(0, 2) : "??"}
+                            <div>
+                              <div className="font-semibold text-black text-sm">
+                                {sub.merchant}
                               </div>
-                              <div>
-                                <div className="font-semibold text-white text-sm">
-                                  {sub.merchant}
+                              {sub.category && (
+                                <div className="text-[11px] text-gray-500 capitalize">
+                                  {sub.category}
                                 </div>
-                                {sub.category && (
-                                  <div className="text-[11px] text-slate-400 capitalize">
-                                    {sub.category}
-                                  </div>
-                                )}
-                              </div>
+                              )}
                             </div>
                           </td>
 
                           {/* Amount */}
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="font-mono font-semibold text-white text-sm">
+                            <div className="font-mono font-semibold text-black text-sm">
                               {formatCurrency(amount, sub.currency)}
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono">
+                            <div className="text-[11px] text-gray-500 font-mono">
                               {cycle.includes("annual") || cycle.includes("year")
                                 ? `${formatCurrency(amount / 12)}/mo equiv`
                                 : `${formatCurrency(amount)}/mo`}
@@ -574,24 +542,24 @@ export default function DashboardPage() {
 
                           {/* Cycle */}
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-xs font-mono capitalize px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-300 border border-slate-700/60">
+                            <span className="text-xs font-mono capitalize px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 border border-gray-200">
                               {cycle}
                             </span>
                           </td>
 
                           {/* Last charge */}
-                          <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-slate-300">
+                          <td className="px-6 py-4 whitespace-nowrap font-mono text-xs text-gray-600">
                             {formatDateDisplay(sub.last_charge_date)}
                           </td>
 
                           {/* Next renewal */}
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs text-slate-200">
+                              <span className="font-mono text-xs text-gray-800">
                                 {formatDateDisplay(nextRenewal)}
                               </span>
                               {isSoon && (
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black text-white font-medium">
                                   Renews Soon
                                 </span>
                               )}
@@ -601,12 +569,12 @@ export default function DashboardPage() {
                           {/* Status */}
                           <td className="px-6 py-4 whitespace-nowrap text-right">
                             {active ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-black"></span>
                                 Active
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-white text-gray-500 border border-gray-200">
                                 Inactive
                               </span>
                             )}
@@ -624,3 +592,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
