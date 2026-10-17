@@ -50,7 +50,7 @@
                                           v
       +-----------------------------------------------------------------------------+
       |                          2. EXTRACTION SERVICE                              |
-      |         Google Gemini 2.5 Flash JSON Output (Deterministic Fallback)         |
+      |         Google Gemini 3.5 Flash JSON Output (Deterministic Fallback)         |
       |     Parses: Merchant, Amount, Currency, Billing Cycle, Date, Category       |
       +-----------------------------------------------------------------------------+
                                           |
